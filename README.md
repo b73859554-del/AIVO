@@ -4,7 +4,7 @@ AIVO is a new Android-first application, developed independently from any other 
 
 ## Current status
 
-Phase 1 foundation, Phase 2 onboarding/dashboard, and the Phase 3 client work are represented in this repository. Phase 3 adds AIVO-only HTTPS transport, environment-separated configuration, encrypted local sessions/history, email and Google sign-in requests, and a multilingual chat interface with history, attachments, copy, speech, and cancellation controls. Live authentication and AI responses require an external AIVO backend and OAuth configuration that are not currently available. See [the feature status register](docs/FEATURE_STATUS.md), [the architecture](docs/ARCHITECTURE.md), and the [Phase 3 backend contract](docs/PHASE_3_BACKEND_CONTRACT.md).
+Phase 1 foundation, Phase 2 onboarding/dashboard, Phase 3 client flows, and Phase 4 foreground voice features are represented in this repository. The chat offers push-to-talk English, Hindi, and Urdu transcription, a configurable Android text-to-speech engine with pause/resume/stop controls, and optional automatic reading. On-device recognition is preferred; use of a system provider that may process audio externally requires explicit consent. Transcripts remain in the composer until the user reviews and sends them. No always-on wake word or background microphone service is implemented. Live authentication and AI responses still require an external AIVO backend and OAuth configuration that are not currently available. See the [feature status register](docs/FEATURE_STATUS.md), [architecture](docs/ARCHITECTURE.md), [voice assistant design](docs/VOICE_ASSISTANT.md), and [Phase 3 backend contract](docs/PHASE_3_BACKEND_CONTRACT.md).
 
 ## Build and test
 

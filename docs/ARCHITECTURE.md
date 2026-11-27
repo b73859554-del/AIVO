@@ -12,8 +12,8 @@ This is an independent application with its own source tree and Git history. It 
 ## Application structure
 
 - `app`: one native Kotlin Android application module.
-- `app/src/main`: onboarding/dashboard, account/authentication, and chat activities with Android resources and manifest.
-- `app/src/test`: JVM unit tests for environment URL policy, API routing, authentication/session behavior, encryption, conversation rules, and profile normalization.
+- `app/src/main`: onboarding/dashboard, account/authentication, and chat activities with Android resources and manifest. Chat voice input/output uses Android speech APIs while the activity is foregrounded.
+- `app/src/test`: JVM unit tests for environment URL policy, API routing, authentication/session behavior, encryption, conversation/profile rules, and voice-state/privacy transitions.
 - `gradle/libs.versions.toml`: centralized Android, Kotlin, auth, serialization, and test dependency versions.
 - `.github/workflows/android.yml`: CI build, lint, and unit-test checks.
 
@@ -38,6 +38,14 @@ The server must validate all requests and resource ownership, validate Google ID
 Email registration/sign-in/password reset, Google ID-token exchange, refresh, logout, account deletion, and chat are implemented as client requests to AIVO-owned paths. The app exposes English, Hindi, and Urdu chat language selection, local encrypted history, new/rename/delete, copy, device text-to-speech, stop/cancellation, and supported attachment selection. The composer is available only when an endpoint and encrypted local session are available. The app accepts only a real assistant response from the server; it does not generate mock replies.
 
 No AIVO backend is implemented or deployed here, and no OAuth client registration, production signing, or AI provider is configured. Thus live authentication, backend ID-token validation, AI generation, server-side deletion, and fresh-install-to-real-response are not verified. Stop cancels/disconnects the client request, but cannot guarantee that server-side inference stops after receipt. Device speech synthesis behavior depends on the selected OS engine.
+
+## Phase 4 voice behavior and boundaries
+
+The chat uses Android `SpeechRecognizer` for explicit foreground push-to-talk. It requests `RECORD_AUDIO` only after a user action, prefers the platform on-device recognizer when available, and requires explicit consent before falling back to the system provider that may process audio remotely. Recognition languages follow the chat selector (`en-US`, `hi-IN`, `ur-PK`). Results are placed in the composer for review; raw audio is neither stored by AIVO nor sent to the AIVO backend. The user must press Send to submit transcript text through the existing chat request.
+
+Android text-to-speech uses installed system voices and a saved speech rate; automatic reading defaults off. Playback can be paused/resumed/stopped; resume uses the last range reported by the engine and may restart the current utterance if the engine does not provide range callbacks. Recognition and speech stop when the activity is paused or destroyed. No foreground microphone service, background capture, or wake-word listener exists.
+
+See [VOICE_ASSISTANT.md](VOICE_ASSISTANT.md) for privacy controls and Android wake-word feasibility. Android's standard recognizer is not a continuous hotword API. A future always-listening implementation would need a separate user-selected `VoiceInteractionService` integration or an explicitly enabled, visible, device-compatible low-power design; it is not safe to silently keep a microphone open from this ordinary chat activity.
 
 ## Build baseline
 

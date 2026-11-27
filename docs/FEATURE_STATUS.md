@@ -1,6 +1,6 @@
 # AIVO 40-section feature status
 
-This register tracks delivered phases and the active Phase 3 scope. Phase 3 is limited to Sections 4, 14, 30, and 36. Other sections remain unassessed where no implementation scope has been supplied. Section 40 remains planned.
+This register tracks delivered Phases 1–4. Phase 3 delivered client work for Sections 4, 14, 30, and 36; Phase 4 adds foreground voice interaction to the chat. Other sections remain unassessed where no implementation scope has been supplied. Section 40 remains planned and was not part of Phase 4.
 
 ## Phase 1 foundation
 
@@ -31,6 +31,17 @@ This register tracks delivered phases and the active Phase 3 scope. Phase 3 is l
 | Chat and conversation features | Client implemented; live AI blocked | Local encrypted history/new/rename/delete, English/Hindi/Urdu selection, request cancellation, copy, device TTS, and supported attachment input. Real chat requests require AIVO endpoint and authenticated session; no fake replies. |
 | Fresh install to a real AI response | Blocked on external setup | Requires deployed AIVO auth/chat service, Google OAuth client registration as applicable, server ID-token/nonce verification, and AI provider configuration. Not verified on a device. |
 
+## Phase 4 voice assistant
+
+| Deliverable | Status | Evidence / boundary |
+|---|---|---|
+| Voice input | Client implemented; device/provider behavior unverified | Explicit foreground push-to-talk, runtime microphone permission, partial/final transcript handling, English/Hindi/Urdu tags, cancellation, and user-facing service/language/network errors. Transcript stays in the composer until the user taps Send. |
+| Recognition privacy | Implemented with provider-dependent boundary | Uses on-device recognizer when Android reports it available. Otherwise requires explicit consent before the system provider, which may process audio externally. AIVO stores/uploads no raw audio. |
+| Text-to-speech | Client implemented; device/provider behavior unverified | Uses installed Android TTS, persists language/local voice/speech rate, auto-speak opt-in (off by default), and exposes pause/resume/stop. Resume uses engine range callbacks when supplied. |
+| Background and lock-screen behavior | Implemented for this chat activity | Recognition and speech stop when the activity is paused or destroyed. No microphone foreground service or background capture is registered. |
+| “Hey AIVO” wake word | Not implemented | Android's standard `SpeechRecognizer` is not a continuous hotword API. `VoiceInteractionService`/OEM low-power hotword routes require separate system/device integration and privacy/battery design; see [VOICE_ASSISTANT.md](VOICE_ASSISTANT.md). No always-on claim. |
+| Device validation | Unverified | No emulator or physical Android device is attached; language model/voice availability depends on the device and speech service. |
+
 ## Specification sections
 
 | Section | Status | Evidence / boundary |
@@ -38,7 +49,7 @@ This register tracks delivered phases and the active Phase 3 scope. Phase 3 is l
 | 1 | Unassessed | Detailed requirement was not included in the Phase 1 input. |
 | 2 | Phase 2 delivered | The supplied Phase 2 scope—Android foundation, AIVO branding, onboarding, and dashboard—is delivered collectively. |
 | 3 | Phase 2 delivered | The supplied Phase 2 scope—Android foundation, AIVO branding, onboarding, and dashboard—is delivered collectively. |
-| 4 | Client partially implemented; live AI blocked | Multilingual composer, local history/new/rename/delete, copy, device TTS, stop/cancel, errors/loading, and bounded image/PDF/text attachments. Real assistant response requires unavailable backend. |
+| 4 | Client partially implemented; live AI blocked | Multilingual chat, history, attachments, explicit voice transcription into composer, configurable device TTS with playback controls, cancellation, and errors. Real assistant responses require the unavailable backend. |
 | 5 | Unassessed | Detailed requirement was not included in the Phase 1 input. |
 | 6 | Unassessed | Detailed requirement was not included in the Phase 1 input. |
 | 7 | Unassessed | Detailed requirement was not included in the Phase 1 input. |

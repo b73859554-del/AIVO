@@ -83,6 +83,8 @@ Success response:
 
 The client stores user/assistant conversation history in an encrypted app-private file, excluded from backup/transfer. It accepts only a non-empty `assistant` message from the real AIVO response; it does not synthesize a success or fallback answer. Stop disconnects/cancels the client request but cannot promise that server-side inference stopped after receipt.
 
+Voice input does not add a backend route or upload raw audio. The Android recognition service returns a transcript to the composer; AIVO sends only the transcript as ordinary user message text after the user reviews and taps Send.
+
 ## External setup and unverified behavior
 
 No AIVO backend is implemented or deployed by this repository. No endpoint, Google OAuth registration, signing fingerprint, recovery-mail provider, or AI-provider credential is configured. Therefore the real email/Google session flow, backend ID-token validation, AI generation, server-side deletion, and fresh-install-to-real-response journey remain unverified and require those external AIVO services. Do not substitute a mock service or legacy backend.

@@ -74,3 +74,25 @@ Fresh command result at `2026-11-27T21:38:05.286+05:00`: 19 unit tests passed (0
 - No release APK/AAB, production signing, deployed service, or live backend connection.
 - No production OAuth/API credentials or AI service integration.
 - Foundation CI tests and lint are not the Section 40 AI-assisted fixing or self-healing capability.
+
+## Phase 4 local validation
+
+Command:
+
+```powershell
+.\gradlew.bat :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+```
+
+Final validation completed at `2026-11-27T22:09:55.882+05:00`:
+
+| Check | Result | Notes |
+|---|---|---|
+| Kotlin/Android compilation | Passed | Phase 4 voice code and Android manifest compiled. |
+| JVM unit tests | Passed (23 tests) | 0 failures, 0 errors, 0 skipped; four voice-state/privacy-policy tests cover permission gating/denial, recognition completion/cancellation/errors, playback pause/resume/stop, and explicit consent for system recognition. |
+| Android lint | Passed with 11 warnings | 0 lint errors. Remaining warnings are target/tool/dependency version advisories and `SharedPreferences.edit` KTX style hints. |
+| Debug APK assembly | Passed | Development debug APK built locally; not a release artifact or device test. |
+| Diff whitespace | Passed | `git diff --check` passed. |
+| Device/runtime voice tests | Not run | `adb devices -l` returned no attached emulator or physical device. Recognition-language/model availability, permissions, microphone capture, TTS engine behavior, and lock-screen behavior are not device-verified. |
+| GitHub Actions | Pending | Phase 4 changes are not pushed yet. |
+
+No continuous audio/video recording, audio persistence, or audio upload to AIVO is implemented. A system speech provider may process audio externally only after explicit user consent. Always-on wake word remains unimplemented.

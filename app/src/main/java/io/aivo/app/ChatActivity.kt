@@ -1,15 +1,24 @@
 package io.aivo.app
 
+import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
+import android.content.pm.PackageManager
 import android.graphics.Typeface
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
+import android.speech.tts.Voice
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -18,9 +27,11 @@ import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.BaseAdapter
 import android.widget.Button
+import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ListView
+import android.widget.SeekBar
 import android.widget.ScrollView
 import android.widget.Spinner
 import android.widget.TextView
@@ -51,6 +62,7 @@ class ChatActivity : Activity() {
     private lateinit var languageSpinner: Spinner
     private lateinit var messageAdapter: MessageAdapter
     private lateinit var currentTitleView: TextView
+    private lateinit var voicePreferences: SharedPreferences
     private var currentConversation: StoredConversation? = null
     private var selectedAttachment: SelectedAttachment? = null
     private var generationJob: Job? = null
@@ -59,6 +71,22 @@ class ChatActivity : Activity() {
     private var isGenerating = false
     private var tts: TextToSpeech? = null
     private var ttsReady = false
+    private var speechRecognizer: SpeechRecognizer? = null
+    private var recognitionProvider: SpeechRecognitionProvider? = null
+    private var recognitionGeneration = 0
+    private var microphonePermissionRequestPending = false
+    private var speechGeneration = 0
+    private var activeUtteranceId: String? = null
+    private var spokenText: String? = null
+    private var speechResumeOffset = 0
+    private var speechBaseOffset = 0
+    private var voiceState = VoiceAssistantState()
+    private var voiceIndicator: TextView? = null
+    private var voiceInputButton: Button? = null
+    private var voiceSettingsButton: Button? = null
+    private var pauseSpeechButton: Button? = null
+    private var resumeSpeechButton: Button? = null
+    private var stopSpeechButton: Button? = null
     private var preferredLanguage = DEFAULT_LANGUAGE
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -66,7 +94,17 @@ class ChatActivity : Activity() {
         api = AivoApiClient(BackendConfiguration.proxyBaseUrl)
         authentication = AuthenticationRepository(api, EncryptedSessionStore(this))
         conversations = EncryptedConversationStore(this)
-        tts = TextToSpeech(this) { result -> ttsReady = result == TextToSpeech.SUCCESS }
+        voicePreferences = getSharedPreferences(VOICE_PREFERENCES, Context.MODE_PRIVATE)
+        preferredLanguage = voicePreferences.getString(KEY_LANGUAGE, DEFAULT_LANGUAGE)
+            ?.takeIf { it in LANGUAGE_CODES }
+            ?: DEFAULT_LANGUAGE
+        tts = TextToSpeech(this) { result ->
+            ttsReady = result == TextToSpeech.SUCCESS
+            if (ttsReady && !isFinishing && !isDestroyed) {
+                tts?.setOnUtteranceProgressListener(createSpeechProgressListener())
+                applySpeechSettings()
+            }
+        }
         try {
             currentConversation = savedInstanceState?.getString(STATE_CONVERSATION_ID)
                 ?.let(conversations::find)
@@ -78,9 +116,73 @@ class ChatActivity : Activity() {
         render()
     }
 
+    override fun onPause() {
+        if (
+            voiceState.mode == VoiceMode.STARTING ||
+            voiceState.mode == VoiceMode.LISTENING ||
+            voiceState.mode == VoiceMode.PROCESSING
+        ) {
+            cancelVoiceInput(showMessage = false)
+        }
+        if (voiceState.mode == VoiceMode.SPEAKING || voiceState.mode == VoiceMode.PAUSED) {
+            stopSpeech(showMessage = false)
+        }
+        super.onPause()
+    }
+
+    override fun onStop() {
+        if (voiceState.mode == VoiceMode.AWAITING_PERMISSION) {
+            microphonePermissionRequestPending = false
+            cancelVoiceInput(showMessage = false)
+        }
+        super.onStop()
+    }
+
     override fun onSaveInstanceState(outState: Bundle) {
         currentConversation?.id?.let { outState.putString(STATE_CONVERSATION_ID, it) }
         super.onSaveInstanceState(outState)
+    }
+
+    @Deprecated("Deprecated in Android; used for the runtime microphone permission result.")
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray,
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode != REQUEST_RECORD_AUDIO) return
+        if (!microphonePermissionRequestPending) return
+        microphonePermissionRequestPending = false
+        if (voiceState.mode != VoiceMode.AWAITING_PERMISSION || isFinishing || isDestroyed) return
+        val granted = grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED
+        voiceState = VoiceAssistantTransitions.permissionResult(granted)
+        refreshVoiceUi()
+        if (granted) {
+            startSpeechRecognition()
+        } else {
+            status.text = getString(
+                if (shouldShowRequestPermissionRationale(Manifest.permission.RECORD_AUDIO)) {
+                    R.string.voice_permission_denied
+                } else {
+                    R.string.voice_permission_settings
+                },
+            )
+        }
+    }
+
+    private fun releaseSpeechRecognizer(cancel: Boolean = false): Boolean {
+        val recognizer = speechRecognizer ?: return false
+        speechRecognizer = null
+        var cancellationFailed = false
+        if (cancel) {
+            try {
+                recognizer.cancel()
+            } catch (_: IllegalStateException) {
+                cancellationFailed = true
+            }
+        }
+        recognizer.destroy()
+        return cancellationFailed
     }
 
     @Deprecated("Deprecated in Android; used to receive the system document picker result.")
@@ -109,6 +211,8 @@ class ChatActivity : Activity() {
     override fun onDestroy() {
         stopActiveRequest()
         screenScope.cancel()
+        cancelVoiceInput(showMessage = false)
+        releaseSpeechRecognizer()
         tts?.stop()
         tts?.shutdown()
         super.onDestroy()
@@ -153,7 +257,15 @@ class ChatActivity : Activity() {
             )
             onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
                 override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                    preferredLanguage = LANGUAGE_CODES.getOrElse(position) { DEFAULT_LANGUAGE }
+                    val selectedLanguage = LANGUAGE_CODES.getOrElse(position) { DEFAULT_LANGUAGE }
+                    if (preferredLanguage != selectedLanguage) {
+                        preferredLanguage = selectedLanguage
+                        editVoicePreferences { putString(KEY_LANGUAGE, selectedLanguage) }
+                        if (voiceState.mode == VoiceMode.SPEAKING || voiceState.mode == VoiceMode.PAUSED) {
+                            stopSpeech(showMessage = false)
+                        }
+                        if (ttsReady) applySpeechSettings()
+                    }
                 }
 
                 override fun onNothingSelected(parent: AdapterView<*>?) = Unit
@@ -233,6 +345,12 @@ class ChatActivity : Activity() {
             background = roundedBackground(getColor(R.color.aivo_canvas), 12f, getColor(R.color.aivo_border))
         }
         composer.addView(messageInput, matchWidth())
+        voiceIndicator = TextView(this).apply {
+            textSize = 13f
+            setTextColor(getColor(R.color.aivo_muted))
+            setPadding(dp(4), dp(6), dp(4), dp(6))
+        }
+        composer.addView(voiceIndicator, matchWidth())
         val actions = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -243,11 +361,28 @@ class ChatActivity : Activity() {
         stopButton = addButton(actions, getString(R.string.stop_generation)) { stopGeneration() }
         stopButton.visibility = View.GONE
         composer.addView(actions)
+        val voiceActions = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        voiceInputButton = addButton(voiceActions, getString(R.string.voice_start)) { toggleVoiceInput() }
+        voiceSettingsButton = addButton(voiceActions, getString(R.string.voice_settings)) { showVoiceSettings() }
+        composer.addView(voiceActions)
+        val speechActions = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        pauseSpeechButton = addButton(speechActions, getString(R.string.voice_pause)) { pauseSpeech() }
+        resumeSpeechButton = addButton(speechActions, getString(R.string.voice_resume)) { resumeSpeech() }
+        stopSpeechButton = addButton(speechActions, getString(R.string.voice_stop)) { stopSpeech() }
+        composer.addView(speechActions)
         parent.addView(composer)
+        refreshVoiceUi()
     }
 
     private fun sendMessage() {
         if (isGenerating) return
+        cancelVoiceInput(showMessage = false)
         val content = messageInput.text.toString().trim()
         if (content.isEmpty()) {
             status.text = getString(R.string.chat_empty_message)
@@ -321,6 +456,9 @@ class ChatActivity : Activity() {
                     )
                     currentTitleView.text = currentConversation?.title
                     status.text = getString(R.string.chat_ready)
+                    if (voicePreferences.getBoolean(KEY_AUTO_SPEAK, false)) {
+                        speakText(answer.content)
+                    }
                 }
             } catch (exception: CancellationException) {
                 if (generationId == currentGeneration && !isFinishing) {
@@ -378,6 +516,7 @@ class ChatActivity : Activity() {
         sendButton.isEnabled = !generating
         attachmentButton.isEnabled = !generating
         stopButton.visibility = if (generating) View.VISIBLE else View.GONE
+        voiceInputButton?.isEnabled = !generating
         if (::messageAdapter.isInitialized) {
             messageAdapter.notifyDataSetChanged()
             if (messageAdapter.count > 0) transcript.setSelection(messageAdapter.count - 1)
@@ -536,19 +675,605 @@ class ChatActivity : Activity() {
         status.text = getString(R.string.message_copied)
     }
 
+    private fun toggleVoiceInput() {
+        if (
+            voiceState.mode == VoiceMode.AWAITING_PERMISSION ||
+            voiceState.mode == VoiceMode.STARTING ||
+            voiceState.mode == VoiceMode.LISTENING ||
+            voiceState.mode == VoiceMode.PROCESSING
+        ) {
+            cancelVoiceInput()
+        } else {
+            beginVoiceInput()
+        }
+    }
+
+    private fun beginVoiceInput() {
+        if (isGenerating) {
+            status.text = getString(R.string.voice_recognition_during_generation)
+            return
+        }
+        if (!packageManager.hasSystemFeature(PackageManager.FEATURE_MICROPHONE)) {
+            voiceState = VoiceAssistantTransitions.recognitionFailed(VoiceError.MICROPHONE_UNAVAILABLE)
+            status.text = getString(R.string.voice_microphone_unavailable)
+            refreshVoiceUi()
+            return
+        }
+
+        val recognitionAvailable = SpeechRecognizer.isRecognitionAvailable(this)
+        val onDeviceAvailable = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            SpeechRecognizer.isOnDeviceRecognitionAvailable(this)
+        val provider = SpeechPrivacyPolicy.provider(onDeviceAvailable)
+        recognitionProvider = provider
+        if (!recognitionAvailable) {
+            voiceState = VoiceAssistantTransitions.requestListening(
+                permissionGranted = false,
+                recognitionAvailable = false,
+            )
+            status.text = getString(R.string.voice_input_unavailable)
+            refreshVoiceUi()
+            return
+        }
+        val consented = voicePreferences.getBoolean(KEY_EXTERNAL_RECOGNITION_CONSENT, false)
+        if (!SpeechPrivacyPolicy.mayStart(provider, consented)) {
+            AlertDialog.Builder(this)
+                .setTitle(R.string.voice_external_consent_title)
+                .setMessage(R.string.voice_external_consent_message)
+                .setNegativeButton(R.string.cancel_label) { _, _ ->
+                    status.text = getString(R.string.voice_consent_needed)
+                }
+                .setPositiveButton(R.string.continue_label) { _, _ ->
+                    editVoicePreferences { putBoolean(KEY_EXTERNAL_RECOGNITION_CONSENT, true) }
+                    beginVoiceInput()
+                }
+                .show()
+            return
+        }
+
+        if (voiceState.mode == VoiceMode.SPEAKING || voiceState.mode == VoiceMode.PAUSED) {
+            stopSpeech(showMessage = false)
+        }
+        val permissionGranted = checkSelfPermission(Manifest.permission.RECORD_AUDIO) ==
+            PackageManager.PERMISSION_GRANTED
+        voiceState = VoiceAssistantTransitions.requestListening(permissionGranted, recognitionAvailable)
+        refreshVoiceUi()
+        if (voiceState.mode == VoiceMode.AWAITING_PERMISSION) {
+            status.text = getString(R.string.voice_permission_required)
+            requestMicrophonePermission()
+        } else {
+            startSpeechRecognition()
+        }
+    }
+
+    private fun requestMicrophonePermission() {
+        if (shouldShowRequestPermissionRationale(Manifest.permission.RECORD_AUDIO)) {
+            AlertDialog.Builder(this)
+                .setTitle(R.string.voice_start)
+                .setMessage(R.string.voice_permission_rationale)
+                .setNegativeButton(R.string.cancel_label) { _, _ ->
+                    voiceState = VoiceAssistantTransitions.cancelListening(voiceState)
+                    refreshVoiceUi()
+                }
+                .setPositiveButton(R.string.continue_label) { _, _ ->
+                    launchMicrophonePermissionRequest()
+                }
+                .show()
+        } else {
+            launchMicrophonePermissionRequest()
+        }
+    }
+
+    private fun launchMicrophonePermissionRequest() {
+        microphonePermissionRequestPending = true
+        requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), REQUEST_RECORD_AUDIO)
+    }
+
+    private fun startSpeechRecognition() {
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            voiceState = VoiceAssistantTransitions.permissionResult(granted = false)
+            status.text = getString(R.string.voice_permission_settings)
+            refreshVoiceUi()
+            return
+        }
+        val provider = recognitionProvider
+        if (provider == null || !SpeechRecognizer.isRecognitionAvailable(this)) {
+            voiceState = VoiceAssistantTransitions.recognitionFailed(VoiceError.RECOGNITION_UNAVAILABLE)
+            status.text = getString(R.string.voice_input_unavailable)
+            refreshVoiceUi()
+            return
+        }
+
+        recognitionGeneration += 1
+        val requestId = recognitionGeneration
+        releaseSpeechRecognizer()
+        try {
+            speechRecognizer = when (provider) {
+                SpeechRecognitionProvider.ON_DEVICE ->
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        SpeechRecognizer.createOnDeviceSpeechRecognizer(this)
+                    } else {
+                        SpeechRecognizer.createSpeechRecognizer(this)
+                    }
+                SpeechRecognitionProvider.SYSTEM -> SpeechRecognizer.createSpeechRecognizer(this)
+            }
+        } catch (_: RuntimeException) {
+            speechRecognizer = null
+            voiceState = VoiceAssistantTransitions.recognitionFailed(VoiceError.RECOGNITION_UNAVAILABLE)
+            status.text = getString(R.string.voice_input_unavailable)
+            refreshVoiceUi()
+            return
+        }
+
+        val recognizer = speechRecognizer ?: run {
+            voiceState = VoiceAssistantTransitions.recognitionFailed(VoiceError.RECOGNITION_UNAVAILABLE)
+            status.text = getString(R.string.voice_input_unavailable)
+            refreshVoiceUi()
+            return
+        }
+        recognizer.setRecognitionListener(object : RecognitionListener {
+            override fun onReadyForSpeech(params: Bundle?) {
+                if (!isCurrentRecognition(requestId)) return
+                voiceState = VoiceAssistantTransitions.recognitionStarted(voiceState)
+                status.text = getString(R.string.voice_listening)
+                refreshVoiceUi()
+            }
+
+            override fun onBeginningOfSpeech() {
+                if (!isCurrentRecognition(requestId)) return
+                voiceState = VoiceAssistantTransitions.recognitionStarted(voiceState)
+                status.text = getString(R.string.voice_listening)
+                refreshVoiceUi()
+            }
+
+            override fun onRmsChanged(rmsdB: Float) = Unit
+            override fun onBufferReceived(buffer: ByteArray?) = Unit
+
+            override fun onEndOfSpeech() {
+                if (!isCurrentRecognition(requestId)) return
+                voiceState = VoiceAssistantTransitions.recognitionEnded(voiceState)
+                status.text = getString(R.string.voice_processing)
+                refreshVoiceUi()
+            }
+
+            override fun onError(error: Int) {
+                if (!isCurrentRecognition(requestId)) return
+                recognitionGeneration += 1
+                releaseSpeechRecognizer()
+                voiceState = VoiceAssistantTransitions.recognitionFailed(mapRecognitionError(error))
+                status.text = getString(recognitionErrorMessage(voiceState.error))
+                refreshVoiceUi()
+            }
+
+            override fun onResults(results: Bundle?) {
+                if (!isCurrentRecognition(requestId)) return
+                recognitionGeneration += 1
+                releaseSpeechRecognizer()
+                val transcriptText = results
+                    ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                    ?.firstOrNull()
+                    ?.trim()
+                    .orEmpty()
+                voiceState = VoiceAssistantTransitions.recognitionCompleted(transcriptText.isNotEmpty())
+                if (transcriptText.isNotEmpty()) {
+                    messageInput.setText(transcriptText)
+                    messageInput.setSelection(messageInput.text.length)
+                    status.text = getString(R.string.voice_transcript_ready)
+                } else {
+                    status.text = getString(R.string.voice_no_match)
+                }
+                refreshVoiceUi()
+            }
+
+            override fun onPartialResults(partialResults: Bundle?) {
+                if (!isCurrentRecognition(requestId)) return
+                val partial = partialResults
+                    ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                    ?.firstOrNull()
+                    ?.takeIf(String::isNotBlank)
+                if (partial != null) status.text = getString(R.string.voice_partial_transcript, partial)
+            }
+
+            override fun onEvent(eventType: Int, params: Bundle?) = Unit
+        })
+
+        voiceState = VoiceAssistantTransitions.requestListening(
+            permissionGranted = true,
+            recognitionAvailable = true,
+        )
+        refreshVoiceUi()
+        val recognitionIntent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, recognitionLanguageTag(preferredLanguage))
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, recognitionLanguageTag(preferredLanguage))
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+        }
+        try {
+            recognizer.startListening(recognitionIntent)
+        } catch (_: RuntimeException) {
+            if (isCurrentRecognition(requestId)) {
+                recognitionGeneration += 1
+                releaseSpeechRecognizer()
+                voiceState = VoiceAssistantTransitions.recognitionFailed(VoiceError.RECOGNITION_UNAVAILABLE)
+                status.text = getString(R.string.voice_input_unavailable)
+                refreshVoiceUi()
+            }
+        }
+    }
+
+    private fun isCurrentRecognition(requestId: Int): Boolean =
+        requestId == recognitionGeneration && !isFinishing && !isDestroyed
+
+    private fun cancelVoiceInput(showMessage: Boolean = true) {
+        val active = voiceState.mode == VoiceMode.AWAITING_PERMISSION ||
+            voiceState.mode == VoiceMode.STARTING ||
+            voiceState.mode == VoiceMode.LISTENING ||
+            voiceState.mode == VoiceMode.PROCESSING
+        if (!active) return
+        microphonePermissionRequestPending = false
+        recognitionGeneration += 1
+        val cancellationFailed = releaseSpeechRecognizer(cancel = true)
+        voiceState = VoiceAssistantTransitions.cancelListening(voiceState)
+        refreshVoiceUi()
+        if (showMessage && ::status.isInitialized) {
+            status.text = getString(if (cancellationFailed) R.string.voice_generic_error else R.string.voice_cancelled)
+        }
+    }
+
+    private fun mapRecognitionError(error: Int): VoiceError = when (error) {
+        SpeechRecognizer.ERROR_AUDIO -> VoiceError.AUDIO
+        SpeechRecognizer.ERROR_CLIENT -> VoiceError.UNKNOWN
+        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> VoiceError.MICROPHONE_PERMISSION_DENIED
+        SpeechRecognizer.ERROR_NETWORK, SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> VoiceError.NETWORK
+        SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> VoiceError.NO_MATCH
+        SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> VoiceError.SERVICE_BUSY
+        SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED,
+        SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE,
+        -> VoiceError.LANGUAGE_UNAVAILABLE
+        else -> VoiceError.UNKNOWN
+    }
+
+    private fun recognitionErrorMessage(error: VoiceError?): Int = when (error) {
+        VoiceError.MICROPHONE_PERMISSION_DENIED -> R.string.voice_permission_denied
+        VoiceError.MICROPHONE_UNAVAILABLE -> R.string.voice_microphone_unavailable
+        VoiceError.RECOGNITION_UNAVAILABLE -> R.string.voice_input_unavailable
+        VoiceError.NO_MATCH -> R.string.voice_no_match
+        VoiceError.NETWORK -> R.string.voice_network_error
+        VoiceError.SERVICE_BUSY -> R.string.voice_service_busy
+        VoiceError.AUDIO -> R.string.voice_audio_error
+        VoiceError.LANGUAGE_UNAVAILABLE -> R.string.voice_language_error
+        VoiceError.SPEECH_OUTPUT_FAILED, VoiceError.UNKNOWN, null -> R.string.voice_generic_error
+    }
+
+    private fun refreshVoiceUi() {
+        val inputActive = voiceState.mode == VoiceMode.AWAITING_PERMISSION ||
+            voiceState.mode == VoiceMode.STARTING ||
+            voiceState.mode == VoiceMode.LISTENING ||
+            voiceState.mode == VoiceMode.PROCESSING
+        voiceInputButton?.text = getString(if (inputActive) R.string.voice_cancel_input else R.string.voice_start)
+        voiceIndicator?.text = getString(
+            when (voiceState.mode) {
+                VoiceMode.AWAITING_PERMISSION -> R.string.voice_status_permission
+                VoiceMode.STARTING, VoiceMode.LISTENING -> R.string.voice_status_listening
+                VoiceMode.PROCESSING -> R.string.voice_status_processing
+                VoiceMode.SPEAKING -> R.string.voice_output_speaking
+                VoiceMode.PAUSED -> R.string.voice_output_paused
+                VoiceMode.ERROR -> R.string.voice_status_unavailable
+                VoiceMode.IDLE -> R.string.voice_status_ready
+            },
+        )
+        pauseSpeechButton?.visibility = if (voiceState.mode == VoiceMode.SPEAKING) View.VISIBLE else View.GONE
+        resumeSpeechButton?.visibility = if (voiceState.mode == VoiceMode.PAUSED) View.VISIBLE else View.GONE
+        stopSpeechButton?.visibility =
+            if (voiceState.mode == VoiceMode.SPEAKING || voiceState.mode == VoiceMode.PAUSED) View.VISIBLE else View.GONE
+    }
+
     private fun speakMessage(message: StoredChatMessage) {
-        if (!ttsReady) {
+        speakText(message.content)
+    }
+
+    private fun speakText(text: String) {
+        val engine = tts
+        if (!ttsReady || engine == null) {
             status.text = getString(R.string.tts_unavailable)
             return
         }
-        val language = Locale.forLanguageTag(preferredLanguage)
-        val result = tts?.setLanguage(language) ?: TextToSpeech.ERROR
-        if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-            status.text = getString(R.string.tts_language_unavailable)
+        if (text.isBlank()) return
+        if (!voicePreferences.getBoolean(KEY_TTS_DISCLOSURE_ACCEPTED, false)) {
+            AlertDialog.Builder(this)
+                .setTitle(R.string.voice_tts_consent_title)
+                .setMessage(R.string.voice_tts_consent_message)
+                .setNegativeButton(R.string.cancel_label, null)
+                .setPositiveButton(R.string.continue_label) { _, _ ->
+                    editVoicePreferences { putBoolean(KEY_TTS_DISCLOSURE_ACCEPTED, true) }
+                    speakText(text)
+                }
+                .show()
             return
         }
-        tts?.speak(message.content, TextToSpeech.QUEUE_FLUSH, null, message.id)
-        status.text = getString(R.string.tts_speaking)
+        cancelVoiceInput(showMessage = false)
+        stopSpeech(showMessage = false)
+        spokenText = text
+        speechResumeOffset = 0
+        startSpeechSegment(0)
+    }
+
+    private fun startSpeechSegment(offset: Int) {
+        val engine = tts
+        val text = spokenText
+        if (!ttsReady || engine == null || text == null) {
+            status.text = getString(R.string.tts_unavailable)
+            voiceState = VoiceAssistantTransitions.recognitionFailed(VoiceError.SPEECH_OUTPUT_FAILED)
+            refreshVoiceUi()
+            return
+        }
+        val boundedOffset = offset.coerceIn(0, text.length)
+        if (boundedOffset >= text.length) {
+            voiceState = VoiceAssistantTransitions.stopPlayback(voiceState)
+            spokenText = null
+            speechResumeOffset = 0
+            refreshVoiceUi()
+            status.text = getString(R.string.voice_speech_finished)
+            return
+        }
+        if (!applySpeechSettings()) {
+            voiceState = VoiceAssistantTransitions.recognitionFailed(VoiceError.LANGUAGE_UNAVAILABLE)
+            status.text = getString(R.string.tts_language_unavailable)
+            refreshVoiceUi()
+            return
+        }
+
+        speechGeneration += 1
+        val utteranceId = "aivo-speech-$speechGeneration"
+        activeUtteranceId = utteranceId
+        speechBaseOffset = boundedOffset
+        speechResumeOffset = boundedOffset
+        voiceState = VoiceAssistantTransitions.startPlayback()
+        refreshVoiceUi()
+        val result = engine.speak(
+            text.substring(boundedOffset),
+            TextToSpeech.QUEUE_FLUSH,
+            null,
+            utteranceId,
+        )
+        if (result == TextToSpeech.ERROR && activeUtteranceId == utteranceId) {
+            activeUtteranceId = null
+            voiceState = VoiceAssistantTransitions.recognitionFailed(VoiceError.SPEECH_OUTPUT_FAILED)
+            status.text = getString(R.string.voice_output_error)
+            refreshVoiceUi()
+        } else {
+            status.text = getString(R.string.tts_speaking)
+        }
+    }
+
+    private fun pauseSpeech() {
+        if (voiceState.mode != VoiceMode.SPEAKING) {
+            status.text = getString(R.string.voice_not_speaking)
+            return
+        }
+        speechGeneration += 1
+        activeUtteranceId = null
+        tts?.stop()
+        voiceState = VoiceAssistantTransitions.pausePlayback(voiceState)
+        refreshVoiceUi()
+        status.text = getString(R.string.voice_speech_paused)
+    }
+
+    private fun resumeSpeech() {
+        if (voiceState.mode != VoiceMode.PAUSED) {
+            status.text = getString(R.string.voice_not_speaking)
+            return
+        }
+        startSpeechSegment(speechResumeOffset)
+    }
+
+    private fun stopSpeech(showMessage: Boolean = true) {
+        val active = voiceState.mode == VoiceMode.SPEAKING || voiceState.mode == VoiceMode.PAUSED
+        if (!active && spokenText == null) return
+        speechGeneration += 1
+        activeUtteranceId = null
+        tts?.stop()
+        spokenText = null
+        speechResumeOffset = 0
+        voiceState = VoiceAssistantTransitions.stopPlayback(voiceState)
+        refreshVoiceUi()
+        if (showMessage && ::status.isInitialized) status.text = getString(R.string.voice_speech_stopped)
+    }
+
+    private fun createSpeechProgressListener(): UtteranceProgressListener =
+        object : UtteranceProgressListener() {
+            override fun onStart(utteranceId: String?) {
+                if (utteranceId != activeUtteranceId) return
+                runOnUiThread {
+                    if (utteranceId == activeUtteranceId && !isFinishing) {
+                        voiceState = VoiceAssistantTransitions.startPlayback()
+                        refreshVoiceUi()
+                    }
+                }
+            }
+
+            override fun onDone(utteranceId: String?) {
+                if (utteranceId != activeUtteranceId) return
+                runOnUiThread {
+                    if (utteranceId == activeUtteranceId && !isFinishing) {
+                        speechResumeOffset = spokenText?.length ?: 0
+                        activeUtteranceId = null
+                        spokenText = null
+                        speechResumeOffset = 0
+                        voiceState = VoiceAssistantTransitions.stopPlayback(voiceState)
+                        refreshVoiceUi()
+                        status.text = getString(R.string.voice_speech_finished)
+                    }
+                }
+            }
+
+            override fun onError(utteranceId: String?) {
+                reportSpeechError(utteranceId)
+            }
+
+            override fun onError(utteranceId: String?, errorCode: Int) {
+                reportSpeechError(utteranceId)
+            }
+
+            override fun onRangeStart(utteranceId: String?, start: Int, end: Int, frame: Int) {
+                if (utteranceId != activeUtteranceId) return
+                runOnUiThread {
+                    if (utteranceId == activeUtteranceId && !isFinishing) {
+                        speechResumeOffset = (speechBaseOffset + start).coerceAtMost(spokenText?.length ?: 0)
+                    }
+                }
+            }
+        }
+
+    private fun reportSpeechError(utteranceId: String?) {
+        if (utteranceId != activeUtteranceId) return
+        runOnUiThread {
+            if (utteranceId == activeUtteranceId && !isFinishing) {
+                activeUtteranceId = null
+                spokenText = null
+                voiceState = VoiceAssistantTransitions.recognitionFailed(VoiceError.SPEECH_OUTPUT_FAILED)
+                refreshVoiceUi()
+                status.text = getString(R.string.voice_output_error)
+            }
+        }
+    }
+
+    private fun applySpeechSettings(): Boolean {
+        val engine = tts ?: return false
+        val locale = Locale.forLanguageTag(ttsLanguageTag(preferredLanguage))
+        val languageResult = engine.setLanguage(locale)
+        if (languageResult == TextToSpeech.LANG_MISSING_DATA ||
+            languageResult == TextToSpeech.LANG_NOT_SUPPORTED
+        ) {
+            return false
+        }
+        val savedVoice = voicePreferences.getString(KEY_OUTPUT_VOICE, null)
+        val selectedVoice = engine.voices
+            ?.firstOrNull { it.name == savedVoice && it.locale.language == locale.language }
+        if (selectedVoice != null) engine.voice = selectedVoice
+        engine.setSpeechRate(
+            voicePreferences.getFloat(KEY_SPEECH_RATE, DEFAULT_SPEECH_RATE)
+                .coerceIn(MIN_SPEECH_RATE, MAX_SPEECH_RATE),
+        )
+        return true
+    }
+
+    private fun showVoiceSettings() {
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(12), dp(20), dp(8))
+        }
+        val privacyNote = TextView(this).apply {
+            text = getString(R.string.voice_settings_privacy_note)
+            textSize = 14f
+            setTextColor(getColor(R.color.aivo_muted))
+        }
+        content.addView(privacyNote, matchWidth())
+
+        val autoSpeak = CheckBox(this).apply {
+            text = getString(R.string.voice_auto_speak)
+            isChecked = voicePreferences.getBoolean(KEY_AUTO_SPEAK, false)
+        }
+        content.addView(autoSpeak, matchWidth())
+
+        val externalConsent = CheckBox(this).apply {
+            text = getString(R.string.voice_allow_external_processing)
+            isChecked = voicePreferences.getBoolean(KEY_EXTERNAL_RECOGNITION_CONSENT, false)
+        }
+        content.addView(externalConsent, matchWidth())
+
+        val voiceLabel = TextView(this).apply {
+            text = getString(R.string.voice_select_output)
+            setPadding(0, dp(12), 0, dp(4))
+        }
+        content.addView(voiceLabel, matchWidth())
+        val voiceChoices = availableVoiceChoices()
+        val voiceSpinner = Spinner(this).apply {
+            adapter = ArrayAdapter(
+                this@ChatActivity,
+                android.R.layout.simple_spinner_dropdown_item,
+                voiceChoices,
+            )
+        }
+        val currentVoice = voicePreferences.getString(KEY_OUTPUT_VOICE, null)
+        voiceSpinner.setSelection(voiceChoices.indexOfFirst { it.voiceName == currentVoice }.coerceAtLeast(0))
+        content.addView(voiceSpinner, matchWidth())
+
+        val initialRate = voicePreferences.getFloat(KEY_SPEECH_RATE, DEFAULT_SPEECH_RATE)
+            .coerceIn(MIN_SPEECH_RATE, MAX_SPEECH_RATE)
+        val rateLabel = TextView(this).apply {
+            text = getString(R.string.voice_rate_value, getString(R.string.voice_rate_label), initialRate)
+            setPadding(0, dp(12), 0, 0)
+        }
+        content.addView(rateLabel, matchWidth())
+        val rateControl = SeekBar(this).apply {
+            max = SPEECH_RATE_STEPS
+            progress = ((initialRate - MIN_SPEECH_RATE) / (MAX_SPEECH_RATE - MIN_SPEECH_RATE) * SPEECH_RATE_STEPS)
+                .toInt()
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                    val rate = MIN_SPEECH_RATE +
+                        (MAX_SPEECH_RATE - MIN_SPEECH_RATE) * progress / SPEECH_RATE_STEPS
+                    rateLabel.text =
+                        getString(R.string.voice_rate_value, getString(R.string.voice_rate_label), rate)
+                }
+
+                override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
+                override fun onStopTrackingTouch(seekBar: SeekBar?) = Unit
+            })
+        }
+        content.addView(rateControl, matchWidth())
+
+        val settingsScroll = ScrollView(this).apply { addView(content) }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.voice_settings_title)
+            .setView(settingsScroll)
+            .setNegativeButton(R.string.cancel_label, null)
+            .setPositiveButton(R.string.save_label) { _, _ ->
+                val rate = MIN_SPEECH_RATE +
+                    (MAX_SPEECH_RATE - MIN_SPEECH_RATE) * rateControl.progress / SPEECH_RATE_STEPS
+                val selectedVoice = voiceChoices.getOrNull(voiceSpinner.selectedItemPosition)
+                editVoicePreferences {
+                    putBoolean(KEY_AUTO_SPEAK, autoSpeak.isChecked)
+                    if (autoSpeak.isChecked) putBoolean(KEY_TTS_DISCLOSURE_ACCEPTED, true)
+                    putBoolean(KEY_EXTERNAL_RECOGNITION_CONSENT, externalConsent.isChecked)
+                    putString(KEY_OUTPUT_VOICE, selectedVoice?.voiceName)
+                    putFloat(KEY_SPEECH_RATE, rate)
+                }
+                if (
+                    !externalConsent.isChecked &&
+                    recognitionProvider == SpeechRecognitionProvider.SYSTEM
+                ) {
+                    cancelVoiceInput(showMessage = false)
+                }
+                if (voiceState.mode == VoiceMode.SPEAKING || voiceState.mode == VoiceMode.PAUSED) {
+                    stopSpeech(showMessage = false)
+                }
+                if (ttsReady) applySpeechSettings()
+                status.text = getString(R.string.voice_settings_saved)
+            }
+            .show()
+    }
+
+    private fun availableVoiceChoices(): List<VoiceChoice> {
+        val language = Locale.forLanguageTag(ttsLanguageTag(preferredLanguage)).language
+        val localVoices = (if (ttsReady) tts?.voices.orEmpty() else emptyList<Voice>())
+            .filter { it.locale.language == language && !it.isNetworkConnectionRequired }
+            .sortedBy { it.name }
+            .map {
+                VoiceChoice(
+                    getString(R.string.voice_choice_label, it.name, it.locale.displayName),
+                    it.name,
+                )
+            }
+        return listOf(VoiceChoice(getString(R.string.voice_default_output), null)) + localVoices
+    }
+
+    private fun editVoicePreferences(update: SharedPreferences.Editor.() -> Unit) {
+        val editor = voicePreferences.edit()
+        editor.update()
+        editor.apply()
     }
 
     private fun hideKeyboard() {
@@ -655,6 +1380,10 @@ class ChatActivity : Activity() {
 
     private data class SelectedAttachment(val uri: Uri, val name: String, val mimeType: String)
 
+    private data class VoiceChoice(val label: String, val voiceName: String?) {
+        override fun toString(): String = label
+    }
+
     private object GsonHolder {
         val gson = com.google.gson.Gson()
     }
@@ -662,11 +1391,31 @@ class ChatActivity : Activity() {
     private companion object {
         const val STATE_CONVERSATION_ID = "current_conversation_id"
         const val REQUEST_PICK_ATTACHMENT = 4201
+        const val REQUEST_RECORD_AUDIO = 4202
         const val DEFAULT_LANGUAGE = "en"
         const val MAX_ATTACHMENT_BYTES = 4 * 1024 * 1024
         const val MAX_ASSISTANT_RESPONSE_LENGTH = 1_000_000
         const val READ_BUFFER_BYTES = 8 * 1024
+        const val VOICE_PREFERENCES = "aivo_voice_settings"
+        const val KEY_LANGUAGE = "language"
+        const val KEY_EXTERNAL_RECOGNITION_CONSENT = "external_recognition_consent"
+        const val KEY_TTS_DISCLOSURE_ACCEPTED = "tts_disclosure_accepted"
+        const val KEY_AUTO_SPEAK = "auto_speak_responses"
+        const val KEY_OUTPUT_VOICE = "output_voice"
+        const val KEY_SPEECH_RATE = "speech_rate"
+        const val DEFAULT_SPEECH_RATE = 1.0f
+        const val MIN_SPEECH_RATE = 0.75f
+        const val MAX_SPEECH_RATE = 1.5f
+        const val SPEECH_RATE_STEPS = 100
         val LANGUAGE_CODES = listOf("en", "hi", "ur")
         val ALLOWED_ATTACHMENT_TYPES = arrayOf("application/pdf", "text/plain")
+
+        fun recognitionLanguageTag(language: String): String = when (language) {
+            "hi" -> "hi-IN"
+            "ur" -> "ur-PK"
+            else -> "en-US"
+        }
+
+        fun ttsLanguageTag(language: String): String = recognitionLanguageTag(language)
     }
 }
