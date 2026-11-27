@@ -43,7 +43,7 @@ Earlier Phase 2 attempts: the first run (`14:36:52.794`–`14:37:16.410+05:00`) 
 | PR #1 | `07ff120` | Passed at `2026-11-27T14:26:13+05:00` | Run `45973589690` passed unit tests, lint, and debug APK assembly. |
 | PR #1 | `ab38615` | Passed at `2026-11-27T14:29:38+05:00` | Run `45974070129` passed unit tests, lint, and debug APK assembly. |
 | PR #1 | `4ce4593` | Passed at `2026-11-27T14:31:50+05:00` | Run `45974347270` passed unit tests, lint, and debug APK assembly. |
-| Phase 2 | Not run yet | — | Phase 2 changes remain local and uncommitted; CI will run after publishing the review-branch checkpoint. |
+| PR #1 | `6a501a4` | Passed at `2026-11-27T14:42:24+05:00` | Run `45975815716` passed unit tests, lint, and debug APK assembly for the Phase 2 checkpoint. |
 
 ## Not run / not claimed
 
