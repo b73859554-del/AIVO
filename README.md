@@ -33,3 +33,7 @@ This setting only makes a URL available to the app. It does not configure or con
 ## Security
 
 See [SECURITY.md](SECURITY.md) for safe development and reporting guidance. No production credentials, signing keys, OAuth clients, or service endpoints are included.
+
+## Activity records
+
+The timestamped development record is maintained in [AIVO-PROGRESS-LOG.md](AIVO-PROGRESS-LOG.md), [AIVO-SESSION-HISTORY.md](AIVO-SESSION-HISTORY.md), [AIVO-ERROR-REPORT.md](AIVO-ERROR-REPORT.md), and [AIVO-BUILD-AND-TEST-REPORT.md](AIVO-BUILD-AND-TEST-REPORT.md). Times are recorded in Pakistan Standard Time (UTC+05:00); unavailable historical timestamps are identified rather than estimated.
