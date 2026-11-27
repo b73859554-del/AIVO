@@ -163,12 +163,25 @@ class MainActivity : Activity() {
             getString(R.string.dashboard_profile_body),
         )
         addVerticalSpace(content, 14)
+        val endpointConfigured = BackendConfiguration.proxyBaseUrl != null
         addStatusCard(
             content,
             getString(R.string.dashboard_connection_title),
-            getString(R.string.not_connected),
-            getString(R.string.dashboard_connection_body),
+            getString(if (endpointConfigured) R.string.endpoint_configured else R.string.endpoint_not_configured),
+            getString(
+                if (endpointConfigured) {
+                    R.string.dashboard_connection_configured_body
+                } else {
+                    R.string.dashboard_connection_body
+                },
+            ),
         )
+        addPrimaryButton(content, getString(R.string.open_chat)) {
+            startActivity(android.content.Intent(this, ChatActivity::class.java))
+        }
+        addSecondaryButton(content, getString(R.string.account_title)) {
+            startActivity(android.content.Intent(this, AccountActivity::class.java))
+        }
         addPrimaryButton(content, getString(R.string.edit_profile)) {
             editingProfile = true
             nameDraft = preferences.getString(KEY_DISPLAY_NAME, "").orEmpty()

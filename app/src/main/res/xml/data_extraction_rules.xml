@@ -1,8 +1,12 @@
 <data-extraction-rules>
     <cloud-backup>
         <exclude domain="sharedpref" path="aivo_profile.xml" />
+        <exclude domain="sharedpref" path="aivo_secure_store.xml" />
+        <exclude domain="file" path="aivo_conversations_v1" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="sharedpref" path="aivo_profile.xml" />
+        <exclude domain="sharedpref" path="aivo_secure_store.xml" />
+        <exclude domain="file" path="aivo_conversations_v1" />
     </device-transfer>
 </data-extraction-rules>

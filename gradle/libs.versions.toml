@@ -2,9 +2,18 @@
 agp = "8.10.1"
 kotlin = "2.1.20"
 junit = "4.13.2"
+gson = "2.13.1"
+credentials = "1.5.0"
+googleid = "1.1.1"
+coroutines = "1.10.2"
 
 [libraries]
 junit = { module = "junit:junit", version.ref = "junit" }
+gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
+androidx-credentials = { module = "androidx.credentials:credentials", version.ref = "credentials" }
+androidx-credentials-play-services-auth = { module = "androidx.credentials:credentials-play-services-auth", version.ref = "credentials" }
+google-identity = { module = "com.google.android.libraries.identity.googleid:googleid", version.ref = "googleid" }
+kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

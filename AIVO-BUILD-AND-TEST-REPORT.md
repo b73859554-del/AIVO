@@ -44,6 +44,28 @@ Earlier Phase 2 attempts: the first run (`14:36:52.794`–`14:37:16.410+05:00`) 
 | PR #1 | `ab38615` | Passed at `2026-11-27T14:29:38+05:00` | Run `45974070129` passed unit tests, lint, and debug APK assembly. |
 | PR #1 | `4ce4593` | Passed at `2026-11-27T14:31:50+05:00` | Run `45974347270` passed unit tests, lint, and debug APK assembly. |
 | PR #1 | `6a501a4` | Passed at `2026-11-27T14:42:24+05:00` | Run `45975815716` passed unit tests, lint, and debug APK assembly for the Phase 2 checkpoint. |
+| Phase 3 request | In progress | `2026-11-27T21:00:47.690+05:00` onward | Scope supplied at `21:03:35+05:00` for Sections 4, 14, 30, and 36. No production backend or OAuth credentials are configured, so live service flows cannot be verified. |
+
+## Phase 3 local validation
+
+| Check | Result | Notes |
+|---|---|---|
+| Kotlin compilation | Passed at `2026-11-27T21:31:10+05:00` | Final full run completed successfully after moving `GoogleCredentialUnavailableException` to top-level scope and applying UI accuracy fixes. |
+| JVM unit tests | Passed (19 tests) | 0 failures, 0 errors, 0 skipped. Coverage includes URL/path rules, endpoint construction/fail-closed behavior, session validation/refresh/sign-out, AES-GCM integrity, conversation rules, and profile rules. |
+| Android lint | Passed with 10 warnings | No lint errors. Remaining warnings: target SDK 35; newer Gradle/AGP/Kotlin/Credential Manager/Google ID versions available; three KTX `SharedPreferences.edit` style hints. |
+| Debug APK assembly | Passed | `app/build/outputs/apk/debug/app-debug.apk` exists. This is a local development debug build, not a release artifact or device test. |
+| Environment isolation | Passed | A production BuildConfig generated while only `-PAIVO_PROXY_URL=https://dev.example.test` was supplied contained `AIVO_ENVIRONMENT="production"` and `AIVO_PROXY_URL=""`. |
+| Diff whitespace | Passed | `git diff --check` completed without errors. |
+| Android device/runtime | Not run | `adb devices -l` listed no attached emulator or physical device. No UI/runtime integration test is claimed. |
+| GitHub Actions for Phase 3 | Pending | User has now authorized publication; fresh local validation passed and commit/push will precede CI verification. |
+
+The final Phase 3 command `.\gradlew.bat :app:testDebugUnitTest :app:lintDebug :app:assembleDebug` completed with `BUILD SUCCESSFUL in 44s`. All reported warnings are non-fatal. No live backend/OAuth flow or emulator/device test is claimed.
+
+## Authorized publication validation
+
+The user authorized publishing Phase 3 at `2026-11-27T21:36:31.248+05:00`. A fresh full test/lint/debug assembly run is required before committing; results will be appended here. The expected destination is the existing open PR branch `phase-1-activity-logs` in the verified public repository; `main` must remain untouched.
+
+Fresh command result at `2026-11-27T21:38:05.286+05:00`: 19 unit tests passed (0 failures/errors/skips), Android lint passed with 10 warnings, debug APK assembly passed, and `git diff --check` passed.
 
 ## Not run / not claimed
 

@@ -1,15 +1,22 @@
 # Security
 
-## Phase 1 boundaries
+## Current boundaries
 
-This repository contains a development foundation only. It has no production backend, authentication, AI service, release signing key, or configured secret. The Android app makes no network requests. These boundaries are intentional; do not treat the project as production-ready.
+The app implements encrypted local session/history storage and an AIVO-only HTTPS client, but this repository does not include or deploy a production AIVO backend, Google OAuth registration, AI provider, release signing key, or production secret. With no environment endpoint configured, account and chat requests are unavailable. Live sign-in, live AI generation, and production readiness are not claimed.
 
 ## Configuration and secrets
 
-- `AIVO_PROXY_URL` is an optional HTTPS endpoint, not a place for credentials or tokens.
-- Keep secrets out of source, committed Gradle properties, the Android app package, test fixtures, and CI output.
-- Do not add production credentials or deploy services as part of this foundation.
-- The default empty endpoint disables backend configuration.
+- `AIVO_PROXY_URL` is the canonical development endpoint name, not a place for credentials or tokens. Staging and production endpoint values are separate; they never inherit development configuration.
+- Configure only an AIVO-owned HTTPS endpoint. The app constructs fixed `/v1/...` routes, disables redirects and cleartext traffic, and does not use a legacy or alternate-service fallback.
+- Passwords and Google ID tokens are not persisted. Session tokens and local conversation history are AES-GCM encrypted using an Android Keystore key and excluded from backup/transfer.
+- Google Web client IDs are public identifiers. OAuth client secrets, AI-provider keys, and service credentials belong only in the AIVO backend's secret store.
+- The backend must validate Google ID-token signature, issuer, audience, expiry, and nonce; enforce authenticated account/resource ownership; validate request and attachment data; rotate/revoke sessions; rate-limit endpoints; and avoid account enumeration in password recovery.
+- Never put secrets in source, committed Gradle properties, the Android package, test fixtures, or CI output.
+- The default empty endpoint disables remote auth/chat operations.
+
+## Remaining production/security validation
+
+Backend implementation/deployment, domain ownership, token validation, account recovery delivery, abuse controls, and provider-secret handling require separate service setup and are not part of this Android repository. Google OAuth package/client registration, signing fingerprints, brand verification, production signing, and device validation are not configured. Device TTS uses the installed speech engine, which may have its own network/privacy behavior.
 
 ## Reporting
 

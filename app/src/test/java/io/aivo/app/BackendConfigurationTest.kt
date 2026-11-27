@@ -28,6 +28,11 @@ class BackendConfigurationTest {
             "https://user:password@api.example.test",
             "https://api.example.test?token=secret",
             "https://api.example.test#fragment",
+            "https://api.example.test/aivo/../legacy",
+            "https://api.example.test/aivo/%2e%2e/legacy",
+            "https://api.example.test/aivo%2flegacy",
+            "https://api.example.test/aivo%5clegacy",
+            "ftp://api.example.test",
         ).forEach { url ->
             val exception = runCatching { ProxyUrl.resolve(url) }.exceptionOrNull()
             assertNotNull("Expected URL to be rejected: $url", exception)
