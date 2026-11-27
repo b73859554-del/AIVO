@@ -1,6 +1,6 @@
 # AIVO session history
 
-All timestamps are PKT (UTC+05:00). The session is still active, so its end time is not yet known. The first recorded session timestamp is `2026-11-27T14:02:19.042+05:00` (recovered from the local session record); the end timestamp will be added when this development session actually ends. No timestamp has been invented for earlier local actions whose execution time was not retained.
+All timestamps are PKT (UTC+05:00). Active development and verification ended at `2026-11-27T14:31:57.941+05:00`; the first recorded session timestamp is `2026-11-27T14:02:19.042+05:00` (recovered from the local session record). Final report publication is administrative closeout. No timestamp has been invented for earlier local actions whose execution time was not retained.
 
 ## Chronological activity
 
@@ -79,6 +79,10 @@ All timestamps are PKT (UTC+05:00). The session is still active, so its end time
 | `2026-11-27T14:30:01.568+05:00` | Verified CI run `45974070129` passed and confirmed `ab38615` is the current local checkpoint. |
 | `2026-11-27T14:30:18.390+05:00`–`14:30:18.407+05:00` | Updated all four reports with the `ab38615` CI result and checkpoint details. |
 | `2026-11-27T14:30:21.818+05:00` | `git diff --check` passed for the latest report edits. |
+| `2026-11-27T14:30:44+05:00` | Committed `4ce4593` (`Record final AIVO CI verification`) on `phase-1-activity-logs`. |
+| Time not retained; after `14:30:44+05:00` | Pushed `4ce4593` to the authorized AIVO remote; GitHub started PR CI run `45974347270`. |
+| `2026-11-27T14:30:55+05:00`–`14:31:50+05:00` | CI run `45974347270` passed unit tests, lint, and debug APK assembly for commit `4ce4593`. |
+| `2026-11-27T14:31:57.941+05:00` | Verified the passing CI run, open PR #1, and clean worktree; active development and verification ended. |
 
 ## Scope and recording notes
 
