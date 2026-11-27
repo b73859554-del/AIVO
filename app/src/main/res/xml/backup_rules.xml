@@ -1,0 +1,5 @@
+<full-backup-content>
+    <exclude domain="sharedpref" path="aivo_profile.xml" />
+    <exclude domain="sharedpref" path="aivo_secure_store.xml" />
+    <exclude domain="file" path="aivo_conversations_v1" />
+</full-backup-content>

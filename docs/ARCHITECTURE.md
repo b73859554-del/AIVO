@@ -1,28 +1,51 @@
-# AIVO Phase 1 architecture
+# AIVO architecture
 
 ## Application identity
 
 - Product name: AIVO
-- Android application ID: `io.aivo.app`
+- Production Android application ID: `io.aivo.app`
+- Development and staging IDs: `io.aivo.app.dev` and `io.aivo.app.staging`
 - Initial platform: Android
 
-This is a new application foundation with its own source tree and Git history. It does not depend on or import another project's code, data, build products, or services.
+This is an independent application with its own source tree and Git history. It does not depend on or import another project's code, data, build products, or services.
 
-## Initial structure
+## Application structure
 
-- `app`: one native Android application module, implemented in Kotlin.
-- `app/src/main`: minimal activity and manifest; no feature screens or network client are implied.
-- `app/src/test`: local JVM unit tests for backend URL validation.
-- `gradle/libs.versions.toml`: centralized versions for Android and Kotlin build plugins and test dependencies.
-- `.github/workflows/android.yml`: read-only CI build, lint, and unit-test checks.
+- `app`: one native Kotlin Android application module.
+- `app/src/main`: onboarding/dashboard, account/authentication, and chat activities with Android resources and manifest. Chat voice input/output uses Android speech APIs while the activity is foregrounded.
+- `app/src/test`: JVM unit tests for environment URL policy, API routing, authentication/session behavior, encryption, conversation/profile rules, and voice-state/privacy transitions.
+- `gradle/libs.versions.toml`: centralized Android, Kotlin, auth, serialization, and test dependency versions.
+- `.github/workflows/android.yml`: CI build, lint, and unit-test checks.
 
-The initial app uses the Android framework directly. This keeps the foundation small while leaving room to add product modules and libraries when their actual requirements are specified. There is no backend service, persistence layer, authentication flow, or AI integration in Phase 1.
+The UI uses Android framework views. Credential Manager obtains Google ID tokens. Coroutines keep remote requests off the UI thread and support cancellation. Gson handles the fixed AIVO JSON wire contract.
 
-## Backend configuration boundary
+## Local data and account security
 
-`AIVO_PROXY_URL` is an optional build-time configuration value. When absent, it resolves to an empty string and `BackendConfiguration.proxyBaseUrl` is `null`. A configured value must be an HTTPS URL with a host and without user information, query parameters, or a fragment. The value is an endpoint, not a secret. The app does not make requests with it.
+Onboarding's optional display name and completion state are app-private preferences. Session access/refresh tokens are AES-GCM encrypted before storage in private preferences; the AES key is generated and held by Android Keystore. Local conversation history uses AES-GCM and atomic writes to app-private storage. Backup and data-extraction rules exclude session/history files. Passwords and Google ID tokens are sent to the configured AIVO endpoint only for the corresponding request and are not persisted by the app.
 
-Secrets belong in a future, explicitly designed server-side secret store; they must never be embedded in the Android package. CI does not need secrets to build or test this foundation.
+If local encrypted data cannot be decrypted, the app reports the failure and does not silently replace it with an empty session/history. Removing a local session while the backend is unavailable cannot revoke the remote token.
+
+## Backend configuration and transport
+
+The build exposes exactly one normalized runtime endpoint as `BuildConfig.AIVO_PROXY_URL`. Development uses `AIVO_PROXY_URL`; staging and production use their separate inputs. No endpoint fallback is performed across environments or to a legacy service. A missing endpoint disables remote auth/chat.
+
+Configured endpoints must use HTTPS and a hostname, and omit user info, query, fragment, and dot-segment paths. The client constructs only fixed `/v1/...` routes; it uses TLS, disables redirects, bounds request/response sizes, sets finite timeouts, and uses bearer authorization for session-protected routes. It contains no AI-provider secret. These client-side controls do not establish that a configured endpoint is operated by AIVO; only configure an AIVO-owned service.
+
+The server must validate all requests and resource ownership, validate Google ID-token signature/issuer/audience/expiry/nonce, rotate/revoke sessions, rate-limit auth/recovery/chat endpoints, inspect attachment content, and keep service credentials server-side. The endpoint shapes are specified in [PHASE_3_BACKEND_CONTRACT.md](PHASE_3_BACKEND_CONTRACT.md).
+
+## Phase 3 behavior and boundaries
+
+Email registration/sign-in/password reset, Google ID-token exchange, refresh, logout, account deletion, and chat are implemented as client requests to AIVO-owned paths. The app exposes English, Hindi, and Urdu chat language selection, local encrypted history, new/rename/delete, copy, device text-to-speech, stop/cancellation, and supported attachment selection. The composer is available only when an endpoint and encrypted local session are available. The app accepts only a real assistant response from the server; it does not generate mock replies.
+
+No AIVO backend is implemented or deployed here, and no OAuth client registration, production signing, or AI provider is configured. Thus live authentication, backend ID-token validation, AI generation, server-side deletion, and fresh-install-to-real-response are not verified. Stop cancels/disconnects the client request, but cannot guarantee that server-side inference stops after receipt. Device speech synthesis behavior depends on the selected OS engine.
+
+## Phase 4 voice behavior and boundaries
+
+The chat uses Android `SpeechRecognizer` for explicit foreground push-to-talk. It requests `RECORD_AUDIO` only after a user action, prefers the platform on-device recognizer when available, and requires explicit consent before falling back to the system provider that may process audio remotely. Recognition languages follow the chat selector (`en-US`, `hi-IN`, `ur-PK`). Results are placed in the composer for review; raw audio is neither stored by AIVO nor sent to the AIVO backend. The user must press Send to submit transcript text through the existing chat request.
+
+Android text-to-speech uses installed system voices and a saved speech rate; automatic reading defaults off. Playback can be paused/resumed/stopped; resume uses the last range reported by the engine and may restart the current utterance if the engine does not provide range callbacks. Recognition and speech stop when the activity is paused or destroyed. No foreground microphone service, background capture, or wake-word listener exists.
+
+See [VOICE_ASSISTANT.md](VOICE_ASSISTANT.md) for privacy controls and Android wake-word feasibility. Android's standard recognizer is not a continuous hotword API. A future always-listening implementation would need a separate user-selected `VoiceInteractionService` integration or an explicitly enabled, visible, device-compatible low-power design; it is not safe to silently keep a microphone open from this ordinary chat activity.
 
 ## Build baseline
 
@@ -32,4 +55,4 @@ Secrets belong in a future, explicitly designed server-side secret store; they m
 - Kotlin 2.1.20
 - Android compile SDK 36, target SDK 35, minimum SDK 26
 
-These are a starting point for development, not a declaration of production readiness or tested device compatibility.
+These are a development baseline, not a declaration of production readiness or tested device compatibility.
