@@ -58,6 +58,7 @@ Earlier Phase 2 attempts: the first run (`14:36:52.794`–`14:37:16.410+05:00`) 
 | Diff whitespace | Passed | `git diff --check` completed without errors. |
 | Android device/runtime | Not run | `adb devices -l` listed no attached emulator or physical device. No UI/runtime integration test is claimed. |
 | GitHub Actions for Phase 3 publication head `85ed523` | Passed | Run [46035480969](https://github.com/b73859554-del/AIVO/actions/runs/46035480969) passed unit tests, lint, and debug assembly at `2026-11-27T21:41:51+05:00`. GitHub emitted a non-failing Node.js 20 deprecation annotation for `gradle/actions/setup-gradle@v4`. |
+| GitHub Actions for final published head `f6276fa` | Passed | Run [46035921239](https://github.com/b73859554-del/AIVO/actions/runs/46035921239) passed unit tests, lint, and debug assembly at `2026-11-27T21:44:27+05:00`; same non-failing Node.js 20 deprecation annotation. |
 
 The final Phase 3 command `.\gradlew.bat :app:testDebugUnitTest :app:lintDebug :app:assembleDebug` completed with `BUILD SUCCESSFUL in 44s`. All reported warnings are non-fatal. No live backend/OAuth flow or emulator/device test is claimed.
 
