@@ -1,6 +1,6 @@
 # AIVO 40-section feature status
 
-This register records what is known at the Phase 1 gate. The available specification names the Section 40 requirement, but does not define the contents of Sections 1–39. Those sections are intentionally marked unassessed rather than guessed. No later-phase feature is represented as implemented.
+This register tracks the delivered foundation and Phase 2 screen scope. Phase 2 covers the Android foundation, AIVO branding, onboarding, and dashboard under Sections 2–3, 26, 31, and 34. Other sections remain unassessed where no implementation scope is available. Section 40 remains planned.
 
 ## Phase 1 foundation
 
@@ -12,13 +12,23 @@ This register records what is known at the Phase 1 gate. The available specifica
 | CI and developer/security documentation | Delivered | Android CI workflow, build instructions, architecture and security notes |
 | Production readiness, deployed services, release signing, and device validation | Not delivered | Explicitly outside Phase 1 |
 
+## Phase 2 product shell
+
+| Deliverable | Status | Evidence / boundary |
+|---|---|---|
+| AIVO branding | Delivered | AIVO wordmark treatment, brand colors, typography, and Android theme resources |
+| Onboarding | Delivered | Three-step welcome/profile flow; skip intro, back navigation, optional display name, and persisted completion state |
+| Local profile | Delivered | Display name is normalized and saved in private app preferences on-device; can be edited from the dashboard |
+| Dashboard | Delivered | Personalized greeting, local profile status, and explicit disconnected-service status; no fake AI actions |
+| Live AI/backend functionality | Not delivered | No service endpoint, account, or network client is configured |
+
 ## Specification sections
 
 | Section | Status | Phase 1 note |
 |---|---|---|
 | 1 | Unassessed | Detailed requirement was not included in the Phase 1 input. |
-| 2 | Unassessed | Detailed requirement was not included in the Phase 1 input. |
-| 3 | Unassessed | Detailed requirement was not included in the Phase 1 input. |
+| 2 | Phase 2 delivered | The supplied Phase 2 scope—Android foundation, AIVO branding, onboarding, and dashboard—is delivered collectively. |
+| 3 | Phase 2 delivered | The supplied Phase 2 scope—Android foundation, AIVO branding, onboarding, and dashboard—is delivered collectively. |
 | 4 | Unassessed | Detailed requirement was not included in the Phase 1 input. |
 | 5 | Unassessed | Detailed requirement was not included in the Phase 1 input. |
 | 6 | Unassessed | Detailed requirement was not included in the Phase 1 input. |
@@ -41,15 +51,15 @@ This register records what is known at the Phase 1 gate. The available specifica
 | 23 | Unassessed | Detailed requirement was not included in the Phase 1 input. |
 | 24 | Unassessed | Detailed requirement was not included in the Phase 1 input. |
 | 25 | Unassessed | Detailed requirement was not included in the Phase 1 input. |
-| 26 | Unassessed | Detailed requirement was not included in the Phase 1 input. |
+| 26 | Phase 2 delivered | The supplied Phase 2 scope—Android foundation, AIVO branding, onboarding, and dashboard—is delivered collectively. |
 | 27 | Unassessed | Detailed requirement was not included in the Phase 1 input. |
 | 28 | Unassessed | Detailed requirement was not included in the Phase 1 input. |
 | 29 | Unassessed | Detailed requirement was not included in the Phase 1 input. |
 | 30 | Unassessed | Detailed requirement was not included in the Phase 1 input. |
-| 31 | Unassessed | Detailed requirement was not included in the Phase 1 input. |
+| 31 | Phase 2 delivered | The supplied Phase 2 scope—Android foundation, AIVO branding, onboarding, and dashboard—is delivered collectively. |
 | 32 | Unassessed | Detailed requirement was not included in the Phase 1 input. |
 | 33 | Unassessed | Detailed requirement was not included in the Phase 1 input. |
-| 34 | Unassessed | Detailed requirement was not included in the Phase 1 input. |
+| 34 | Phase 2 delivered | The supplied Phase 2 scope—Android foundation, AIVO branding, onboarding, and dashboard—is delivered collectively. |
 | 35 | Unassessed | Detailed requirement was not included in the Phase 1 input. |
 | 36 | Unassessed | Detailed requirement was not included in the Phase 1 input. |
 | 37 | Unassessed | Detailed requirement was not included in the Phase 1 input. |

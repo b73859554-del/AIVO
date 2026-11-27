@@ -19,6 +19,18 @@ Command:
 
 The successful non-overlapping local run reported `BUILD SUCCESSFUL in 1m 44s` (execution timestamp not retained). The final local invocation at `2026-11-27T14:25:57.451+05:00` also completed successfully in 5 seconds, with tests and most build tasks up-to-date. A prior concurrent invocation reported failure because it could not delete the lint intermediate report; see the error report.
 
+## Phase 2 local validation
+
+Successful command:
+
+```powershell
+.\gradlew.bat :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+```
+
+The run from `2026-11-27T14:38:30.369+05:00` to `14:38:57.289+05:00` passed. Six JVM tests passed: three existing backend URL tests and three `ProfileRulesTest` cases for whitespace normalization, the display-name length limit, and first-name extraction. Android lint reported zero errors and four warnings about the target SDK and newer build-tool versions. Debug APK assembly passed. No emulator/device runtime test was performed.
+
+Earlier Phase 2 attempts: the first run (`14:36:52.794`–`14:37:16.410+05:00`) failed Kotlin compilation; the second (`14:37:26.955`–`14:38:09.448+05:00`) compiled and passed tests/assembly but failed lint on an API-27-only theme item. Both issues were fixed before the successful run; see the error report.
+
 ## GitHub Actions
 
 | Run | Commit | Result | Detail |
@@ -31,6 +43,7 @@ The successful non-overlapping local run reported `BUILD SUCCESSFUL in 1m 44s` (
 | PR #1 | `07ff120` | Passed at `2026-11-27T14:26:13+05:00` | Run `45973589690` passed unit tests, lint, and debug APK assembly. |
 | PR #1 | `ab38615` | Passed at `2026-11-27T14:29:38+05:00` | Run `45974070129` passed unit tests, lint, and debug APK assembly. |
 | PR #1 | `4ce4593` | Passed at `2026-11-27T14:31:50+05:00` | Run `45974347270` passed unit tests, lint, and debug APK assembly. |
+| Phase 2 | Not run yet | — | Phase 2 changes remain local and uncommitted; CI will run after publishing the review-branch checkpoint. |
 
 ## Not run / not claimed
 

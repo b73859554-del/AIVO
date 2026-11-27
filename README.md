@@ -2,9 +2,9 @@
 
 AIVO is a new Android-first application, developed independently from any other project.
 
-## Phase 1 status
+## Phase 2 status
 
-Phase 1 establishes the Android project, its build and unit-test scaffolding, safe backend URL configuration, and basic CI and developer documentation. Later product features are not implemented. See [the feature status register](docs/FEATURE_STATUS.md) and [the architecture](docs/ARCHITECTURE.md).
+The Android foundation now has AIVO branding, a three-step onboarding flow, and a local dashboard. Onboarding saves an optional display name only on-device; the dashboard reports honestly that no AI service is connected. See [the feature status register](docs/FEATURE_STATUS.md) and [the architecture](docs/ARCHITECTURE.md).
 
 ## Build and test
 

@@ -8,15 +8,21 @@
 
 This is a new application foundation with its own source tree and Git history. It does not depend on or import another project's code, data, build products, or services.
 
-## Initial structure
+## Application structure
 
 - `app`: one native Android application module, implemented in Kotlin.
-- `app/src/main`: minimal activity and manifest; no feature screens or network client are implied.
-- `app/src/test`: local JVM unit tests for backend URL validation.
+- `app/src/main`: Android activity with branded onboarding and dashboard screens, plus an Android manifest and resource-based theme/copy.
+- `app/src/test`: local JVM unit tests for backend URL validation and display-name normalization.
 - `gradle/libs.versions.toml`: centralized versions for Android and Kotlin build plugins and test dependencies.
 - `.github/workflows/android.yml`: read-only CI build, lint, and unit-test checks.
 
-The initial app uses the Android framework directly. This keeps the foundation small while leaving room to add product modules and libraries when their actual requirements are specified. There is no backend service, persistence layer, authentication flow, or AI integration in Phase 1.
+The app uses the Android framework directly. Onboarding stores its completion flag and optional display name in private app preferences; the dashboard reads and can edit that profile. No account, backend service, authentication flow, or AI integration is configured.
+
+## Phase 2 screens
+
+- Onboarding introduces AIVO, explains the current service boundary, and lets the user optionally save a display name. Users can move backward, skip the introduction, and finish without entering a name.
+- The dashboard displays the saved local profile and clearly states that no live AI service is connected. Its profile action edits the saved name; no unimplemented AI controls are presented.
+- Screen copy and brand colors are Android resources. The app keeps the UI scrollable and preserves onboarding state across activity recreation.
 
 ## Backend configuration boundary
 

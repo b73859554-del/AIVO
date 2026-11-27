@@ -1,6 +1,6 @@
 # AIVO session history
 
-All timestamps are PKT (UTC+05:00). Active development and verification ended at `2026-11-27T14:31:57.941+05:00`; the first recorded session timestamp is `2026-11-27T14:02:19.042+05:00` (recovered from the local session record). Final report publication is administrative closeout. No timestamp has been invented for earlier local actions whose execution time was not retained.
+All timestamps are PKT (UTC+05:00). Phase 1 activity ended at `2026-11-27T14:31:57.941+05:00`; Phase 2 work resumed at `2026-11-27T14:34:42.790+05:00` and is in progress. The first recorded session timestamp is `2026-11-27T14:02:19.042+05:00` (recovered from the local session record). No timestamp has been invented for earlier local actions whose execution time was not retained.
 
 ## Chronological activity
 
@@ -83,12 +83,22 @@ All timestamps are PKT (UTC+05:00). Active development and verification ended at
 | Time not retained; after `14:30:44+05:00` | Pushed `4ce4593` to the authorized AIVO remote; GitHub started PR CI run `45974347270`. |
 | `2026-11-27T14:30:55+05:00`–`14:31:50+05:00` | CI run `45974347270` passed unit tests, lint, and debug APK assembly for commit `4ce4593`. |
 | `2026-11-27T14:31:57.941+05:00` | Verified the passing CI run, open PR #1, and clean worktree; active development and verification ended. |
+| `2026-11-27T14:34:42.790+05:00` | Resumed development for Phase 2. Scope: Android foundation, AIVO branding, onboarding, and dashboard under Sections 2–3, 26, 31, and 34. Stopped at the Phase 2 gate; no Phase 3 work. |
+| `2026-11-27T14:36:52.794+05:00`–`14:37:16.410+05:00` | First Phase 2 validation failed during Kotlin compilation in `MainActivity.kt`; details and repair are in the error report. |
+| `2026-11-27T14:37:26.955+05:00`–`14:38:09.448+05:00` | Second validation compiled the app and passed unit tests/debug assembly, then failed lint because a navigation-bar style item requires API 27 while min SDK is 26. |
+| Time not retained; before `14:38:30.369+05:00` | Fixed the layout-parameter and keyboard method-reference compilation errors; moved the API-27 theme item into `values-v27`; added a branded app icon and Android backup exclusions for the local profile. |
+| `2026-11-27T14:38:30.369+05:00`–`14:38:57.289+05:00` | Full Phase 2 local command passed unit tests, lint, and debug APK assembly. |
+| Time not retained; after `14:38:57.289+05:00` | Updated the README, architecture, feature register, and Phase 2 activity reports. Changes remain local and uncommitted. |
+| `2026-11-27T14:40:29.604+05:00` | `git diff --check` passed; confirmed six JVM tests passed (three backend URL tests and three profile-rule tests), with no failures or skips. |
+| `2026-11-27T14:40:34.999+05:00`–`14:40:35.006+05:00` | Updated the session and build/test reports with the resumed Phase 2 work and six-test result. |
+| `2026-11-27T14:41:02.625+05:00` | Final pre-checkpoint `git diff --check` passed; Phase 2 changes remain on `phase-1-activity-logs`. |
 
 ## Scope and recording notes
 
-- The detailed Section 1–39 specifications and ordered phase plan were not present in the input; those items remain unassessed.
+- At the Phase 1 gate, detailed Section 1–39 requirements were not part of that turn's input. The subsequent Phase 2 scope for Sections 2–3, 26, 31, and 34 was supplied and implemented as recorded above; other sections remain unassessed.
 - A read-only local history lookup to recover the current session's start timestamp returned unrelated session metadata. No other project's files or source contents were opened or used; that lookup was stopped.
 - No continuous video recording capability is available in this session. No video or screenshots were produced or claimed.
-- The app/agent did not deliberately pause or resume development; some bounded build and CI commands continued asynchronously while work proceeded. Exact background handoff times were not retained.
+- Phase 1 work ended at its recorded close; Phase 2 resumed at `2026-11-27T14:34:42.790+05:00`. No Phase 3 work was started.
+- Some bounded build and CI commands continued asynchronously while work proceeded. Exact background handoff times were not retained.
 - At the last checkpoint, PR #1 remained open with CI passing; merge status was not changed.
 - PR #1 remains unmerged; the branch contains the requested logs, and its latest CI run passed.
