@@ -44,8 +44,9 @@ All timestamps are PKT (UTC+05:00). The session is still active, so its end time
 | Time not retained; after `14:19:40+05:00` | Pushed `phase-1-activity-logs` to the authorized AIVO remote. |
 | `2026-11-27T14:20:04+05:00` | Opened [PR #1](https://github.com/b73859554-del/AIVO/pull/1) so the activity reports can pass CI and be reviewed against protected `main`. |
 | `2026-11-27T14:20:08.315+05:00` | Checked PR #1; it was open and no PR CI run was listed yet. |
+| `2026-11-27T14:20:09+05:00` | CI run `45972835249` started for PR #1. |
 | `2026-11-27T14:20:22.320+05:00`–`14:20:22.344+05:00` | Updated all four reports with the activity-log commit, open PR, and pending PR CI status. |
-| `2026-11-27T14:20:09+05:00`–`14:20:59+05:00` | CI run `45972835249` for PR #1 passed unit tests, lint, and debug APK assembly. |
+| `2026-11-27T14:20:59+05:00` | CI run `45972835249` for PR #1 passed unit tests, lint, and debug APK assembly. |
 | `2026-11-27T14:21:09.800+05:00` | Verified PR #1 remained open and its required Android check passed. |
 | `2026-11-27T14:21:19.532+05:00`–`14:21:19.548+05:00` | Updated the session, error, and build/test reports with the passing PR CI result. |
 | `2026-11-27T14:21:22.793+05:00` | Updated the progress log to show PR CI passed and the PR remains unmerged. |
@@ -61,6 +62,17 @@ All timestamps are PKT (UTC+05:00). The session is still active, so its end time
 | `2026-11-27T14:24:19.087+05:00` | Confirmed the passing CI job completion time and current review-branch checkpoint. |
 | `2026-11-27T14:24:49.345+05:00`–`14:24:49.373+05:00` | Updated all four reports with the passing CI result for commit `49384c2` and the transient GitHub GraphQL error. |
 | `2026-11-27T14:24:55.488+05:00` | `git diff --check` passed for the report update on `phase-1-activity-logs`. |
+| `2026-11-27T14:25:07+05:00` | Committed `07ff120` (`Record latest AIVO CI results`) on `phase-1-activity-logs`. |
+| Time not retained; after `14:25:07+05:00` | Pushed commit `07ff120` to the authorized AIVO remote; GitHub started PR CI run `45973589690`. |
+| `2026-11-27T14:25:26.973+05:00` | Verified PR #1 head `07ff120`; no new CI run appeared in that initial read. |
+| `2026-11-27T14:25:30+05:00` | CI run `45973589690` started for commit `07ff120`. |
+| `2026-11-27T14:25:57.451+05:00` | Ran the local full validation command again; it completed successfully in 5 seconds (test and most build tasks were up-to-date). |
+| `2026-11-27T14:26:13+05:00` | CI run `45973589690` passed unit tests, lint, and debug APK assembly for commit `07ff120`. |
+| `2026-11-27T14:26:22.676+05:00` | Confirmed the passing CI run and PR #1 head through the GitHub REST API. |
+| `2026-11-27T14:27:06.640+05:00`–`14:27:06.660+05:00` | Updated the four reports with the successful PR check and final local validation result. |
+| `2026-11-27T14:27:23.832+05:00` | `git diff --check` passed for the latest log updates. |
+| `2026-11-27T14:27:42.356+05:00` | Updated the session history with commit `07ff120`, its CI result, and the final local validation. |
+| `2026-11-27T14:28:22.467+05:00` | Verified the final report set passes `git diff --check` and remains on the review branch. |
 
 ## Scope and recording notes
 
