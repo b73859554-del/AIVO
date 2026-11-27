@@ -57,7 +57,7 @@ Earlier Phase 2 attempts: the first run (`14:36:52.794`–`14:37:16.410+05:00`) 
 | Environment isolation | Passed | A production BuildConfig generated while only `-PAIVO_PROXY_URL=https://dev.example.test` was supplied contained `AIVO_ENVIRONMENT="production"` and `AIVO_PROXY_URL=""`. |
 | Diff whitespace | Passed | `git diff --check` completed without errors. |
 | Android device/runtime | Not run | `adb devices -l` listed no attached emulator or physical device. No UI/runtime integration test is claimed. |
-| GitHub Actions for Phase 3 | Pending | Fresh local validation passed; implementation commit `c6ddd2e` is created and will be pushed before CI verification. |
+| GitHub Actions for Phase 3 publication head `85ed523` | Passed | Run [46035480969](https://github.com/b73859554-del/AIVO/actions/runs/46035480969) passed unit tests, lint, and debug assembly at `2026-11-27T21:41:51+05:00`. GitHub emitted a non-failing Node.js 20 deprecation annotation for `gradle/actions/setup-gradle@v4`. |
 
 The final Phase 3 command `.\gradlew.bat :app:testDebugUnitTest :app:lintDebug :app:assembleDebug` completed with `BUILD SUCCESSFUL in 44s`. All reported warnings are non-fatal. No live backend/OAuth flow or emulator/device test is claimed.
 
@@ -65,7 +65,7 @@ The final Phase 3 command `.\gradlew.bat :app:testDebugUnitTest :app:lintDebug :
 
 The user authorized publishing Phase 3 at `2026-11-27T21:36:31.248+05:00`. A fresh full test/lint/debug assembly run is required before committing; results will be appended here. The expected destination is the existing open PR branch `phase-1-activity-logs` in the verified public repository; `main` must remain untouched.
 
-Fresh command result at `2026-11-27T21:38:05.286+05:00`: 19 unit tests passed (0 failures/errors/skips), Android lint passed with 10 warnings, debug APK assembly passed, and `git diff --check` passed. Implementation commit: `c6ddd2e`.
+Fresh command result at `2026-11-27T21:38:05.286+05:00`: 19 unit tests passed (0 failures/errors/skips), Android lint passed with 10 warnings, debug APK assembly passed, and `git diff --check` passed. Implementation commit: `c6ddd2e`; publication checkpoint commit: `85ed523`. Both were pushed to PR #1.
 
 ## Not run / not claimed
 
